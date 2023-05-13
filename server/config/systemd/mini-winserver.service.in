@@ -1,0 +1,17 @@
+ 
+[Unit]
+Description=mini_winserver
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env bash -c 'exec ${CMAKE_INSTALL_PREFIX}/mini_winserver/bin/mini_winserver --port 4321 >> /var/log/mini_winserver.log 2>&1'
+KillMode=process
+ExecReload=/usr/bin/env kill -HUP $MAINPID
+ExecStopPost=/usr/bin/env sleep 5
+Restart=on-failure
+RestartSec=1
+StartLimitInterval=45
+StartLimitBurst=3
+
+[Install]
+WantedBy=graphical.target

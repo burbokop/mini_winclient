@@ -1,0 +1,2 @@
+ 
+echo "From postRm script: CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}"

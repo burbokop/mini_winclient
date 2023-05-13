@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Window
-import QtQuick.Controls
 import org.burbokop.mini_winserver
 
 Item {

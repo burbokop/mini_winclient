@@ -102,7 +102,10 @@ WinClient::WinClient(QTcpSocket *socket, uint8_t clientId, QObject *parent)
     write(m_socket, std::uint8_t(0));
     write(m_socket, m_id);
     if (!m_socket->waitForBytesWritten()) {
-        qmlWarning(this) << "Can not write init package: " << m_socket->errorString();
+        qmlWarning(this) << "Can not write init package: " << m_socket->errorString() << " ("
+                         << QMetaEnum::fromType<QTcpSocket::SocketError>().valueToKey(
+                                m_socket->error())
+                         << ")";
         QMetaObject::invokeMethod(this, [this]() { emit dead(QPrivateSignal()); });
         return;
     }

@@ -1,0 +1,8 @@
+ 
+ 
+echo "From preRm script: CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}"
+
+systemctl stop mini-winserver.service 2>/dev/null
+systemctl disable mini-winserver.service 2>/dev/null
+systemctl daemon-reload
+rm -f /etc/systemd/system/mini-winserver.service

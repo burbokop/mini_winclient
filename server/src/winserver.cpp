@@ -78,7 +78,9 @@ bool MiniWinServer::listen(quint16 port)
     }
 
     if (m_verbose) {
-        qInfo().nospace() << "Listening on port: " << m_server->serverPort() << ".";
+        qInfo().nospace() << "Listening on port: " << m_server->serverPort()
+                          << " (addr: " << m_server->serverAddress() << ")"
+                          << ".";
     }
 
     return true;

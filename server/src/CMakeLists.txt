@@ -26,5 +26,5 @@ target_link_libraries(mini_winserver
     PRIVATE Qt6::Quick)
 
 install(TARGETS mini_winserver
-    BUNDLE DESTINATION .
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/mini_winserver/bin
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

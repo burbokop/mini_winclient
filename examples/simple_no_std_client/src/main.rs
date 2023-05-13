@@ -85,7 +85,7 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let mut stdout = WriteFd::new(STDOUT);
 
     writeln!(stdout, "start").unwrap();
-    let mut client = Client::connect(LOCALHOST, 33315).unwrap();
+    let mut client = Client::connect(LOCALHOST, 4321).unwrap();
 
     const W: usize = 1024;
     const H: usize = 1024;

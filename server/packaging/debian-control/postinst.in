@@ -1,0 +1,12 @@
+ 
+echo "From postInst script: CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}"
+
+systemctl stop mini-winserver.service 2>/dev/null
+systemctl disable mini-winserver.service 2>/dev/null
+cp ${CMAKE_INSTALL_PREFIX}/mini_winserver/config/systemd/mini-winserver.service /etc/systemd/system/mini-winserver.service
+systemctl daemon-reload
+
+systemctl import-environment DISPLAY XAUTHORITY
+systemctl enable mini-winserver.service
+systemctl start mini-winserver.service
+systemctl --no-pager status mini-winserver.service
