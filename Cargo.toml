@@ -1,0 +1,11 @@
+[package]
+name = "mini_winclient"
+version = "0.0.1"
+edition = "2021"
+
+[workspace]
+members = [
+    'examples/simple_no_std_client'
+]
+
+[dependencies]
