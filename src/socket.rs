@@ -172,22 +172,23 @@ impl Socket {
     }
 
 
-    pub fn write_transmuted<T: Sized>(&mut self, val: T) -> Result<usize, WriteError> {
-        self.write_bytes(unsafe {
-            slice::from_raw_parts((&val)
-                as *const T
-                as *const u8,
-            size_of::<T>())
-        })
+    pub fn write_transmuted<T: Sized>(&mut self, mut val: T) -> Result<usize, WriteError> {
+        let sl = unsafe {
+            slice::from_raw_parts_mut((&mut val) as *mut T as *mut u8, size_of::<T>())
+        };
+        #[cfg(target_endian = "little")]
+        sl.reverse();
+        self.write_bytes(sl)
     }
 
     pub fn read_transmuted<T: Sized>(&mut self, dst: &mut T) -> Result<usize, ReadError> {
-        self.read_bytes(unsafe {
-            slice::from_raw_parts_mut(dst
-                as *mut T
-                as *mut u8,
-            size_of::<T>())
-        })
+        let sl = unsafe {
+            slice::from_raw_parts_mut(dst as *mut T as *mut u8, size_of::<T>())
+        };
+        let size = self.read_bytes(sl)?;
+        #[cfg(target_endian = "little")]
+        sl.reverse();
+        Ok(size)
     }
 
     pub fn read_bytes(&mut self, b: &mut[u8]) -> Result<usize, ReadError> {

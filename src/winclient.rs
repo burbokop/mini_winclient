@@ -124,10 +124,24 @@ impl<const CAPACITY: usize, const CHUNK_LEN: usize> Client<CAPACITY, CHUNK_LEN> 
     }
 
     pub fn read_package(&mut self) -> Result<Option<Package>, PackageError> {
+        use core::fmt::Write;
+
+        let mut stdout = WriteFd::new(STDOUT);
+
+        writeln!(stdout, "read_package:").unwrap();
+
         match self.s.bufferize() {
             Ok(_) => {
+                writeln!(stdout, "read_package:bufferized").unwrap();
+
                 let mut package_size: u32 = 0;
                 if self.s.peek_transmuted(&mut package_size) {
+                    writeln!(stdout, "read_package:peek_transmuted(psize)): {} => {} + {} = {}",
+                        self.s.bytes_available(),
+                        size_of::<u32>(),
+                        package_size, self.s.bytes_available() >= size_of::<u32>() + package_size as usize
+                    ).unwrap();
+
                     if self.s.bytes_available() >= size_of::<u32>() + package_size as usize {
                         self.s.read_transmuted(&mut package_size);
 
@@ -137,7 +151,11 @@ impl<const CAPACITY: usize, const CHUNK_LEN: usize> Client<CAPACITY, CHUNK_LEN> 
                 Ok(None)
             },
             Err(err) => match err {
-                ReadError::Again => Ok(None),
+                ReadError::Again => {
+                    writeln!(stdout, "read_package:Again").unwrap();
+
+                    Ok(None)
+                },
                 err => Err(PackageError::ReadError(err)),
             },
         }

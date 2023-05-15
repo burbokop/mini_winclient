@@ -2,6 +2,7 @@
 
 #include <QQmlInfo>
 #include <QTcpSocket>
+#include <bit>
 
 #define WARN_WITH_MSG(cond, msg) \
     if (!(cond)) { \
@@ -26,12 +27,25 @@ constexpr std::uint8_t Resize = 1;
 } // namespace event_types
 
 namespace transmute {
+
+constexpr void to_be(char *p, std::size_t s)
+{
+    if constexpr (std::endian::native == std::endian::little) {
+        for (std::size_t i = 0; i < s / 2; ++i) {
+            const auto tmp = p[i];
+            p[i] = p[s - i - 1];
+            p[s - i - 1] = tmp;
+        }
+    }
+}
+
 template<typename T>
 std::optional<T> read(QIODevice *dev)
 {
     if (dev->bytesAvailable() >= sizeof(T)) {
-        const auto bytes = dev->read(sizeof(T));
+        auto bytes = dev->read(sizeof(T));
         assert(bytes.size() == sizeof(T));
+        to_be(bytes.data(), bytes.size());
         const auto ptr = reinterpret_cast<const T *>(bytes.constData());
         return *ptr;
     } else {
@@ -42,11 +56,14 @@ std::optional<T> read(QIODevice *dev)
 template<typename T>
 std::size_t write(QIODevice *dev, const T &v)
 {
-    const auto ptr = reinterpret_cast<const char *>(&v);
+    auto vCopy = v;
+    auto ptr = reinterpret_cast<char *>(&vCopy);
+    to_be(ptr, sizeof(T));
     const auto bytes = dev->write(ptr, sizeof(T));
     assert(bytes == sizeof(T));
     return bytes;
 }
+
 } // namespace transmute
 
 class Package

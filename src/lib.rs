@@ -5,6 +5,7 @@
 
 mod sys;
 mod read;
+pub mod utils;
 pub mod event;
 pub mod socket;
 pub mod bufsocket;

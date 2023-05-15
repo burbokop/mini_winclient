@@ -123,7 +123,7 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
         client.present(Format::GS, W as u16, H as u16, &pixels).unwrap();
 
         writeln!(stdout, "i: {}, (id: {})", i, client.id()).unwrap();
-        Point::now().loop_for(Duration::from_millis(160));
+        Point::now().loop_for(Duration::from_millis(1600));
     }
 }
 
