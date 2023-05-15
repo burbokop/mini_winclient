@@ -6,7 +6,7 @@ use super::syscall::{
         SYS_WRITE,
         SYS_READ,
         SYS_SOCKET,
-        SYS_CONNECT
+        SYS_CONNECT, SYS_FCNTL
     }, __mini_wc_syscall3__, __mini_wc_syscall1__,
 };
 
@@ -110,12 +110,36 @@ pub unsafe fn read(fd: usize, data: *mut c_void, nbytes: usize) -> Result<usize,
     ))
 }
 
+pub unsafe fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize, ErrNo> {
+    separate_usize(__mini_wc_syscall3__(
+        SYS_FCNTL,
+        transmute(fd),
+        transmute(cmd),
+        transmute(arg)
+    ))
+}
+
 pub static STDOUT: usize = 1;
 pub static STDERR: usize = 2;
 
 pub static AF_INET: usize = 2;
 pub static SOCK_STREAM: usize = 1;
 pub static IPPROTO_TCP: usize = 6;
+
+/// Duplicate file descriptor.
+pub static F_DUPFD: usize = 0;
+/// Get file descriptor flags.
+pub static F_GETFD: usize = 1;
+/// Set file descriptor flags.
+pub static F_SETFD: usize = 2;
+/// Get file status flags.
+pub static F_GETFL: usize = 3;
+/// Set file status flags.
+pub static F_SETFL: usize = 4;
+
+pub mod bits {
+    pub static O_NONBLOCK: usize = 04000;
+}
 
 fn flip16(v: u16) -> u16 {
     return (v << 8) | (v >> 8);

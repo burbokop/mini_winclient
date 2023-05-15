@@ -85,7 +85,10 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let mut stdout = WriteFd::new(STDOUT);
 
     writeln!(stdout, "start").unwrap();
-    let mut client = Client::connect(LOCALHOST, 4321).unwrap();
+    let mut client: Client<256, 64> = Client::connect(LOCALHOST, 1234).unwrap();
+
+    client.set_non_blocking_mode(true).unwrap();
+
 
     const W: usize = 1024;
     const H: usize = 1024;
@@ -94,6 +97,14 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let mut i = 0;
     let mut j: usize = 0;
     loop {
+
+        writeln!(stdout, "try read:").unwrap();
+        if let Some(a) = client.read_package().unwrap() {
+            writeln!(stdout, "input package: {:?}", a).unwrap();
+        }
+        writeln!(stdout, "end reading").unwrap();
+
+
         pixels[i] = 255;
         i += 1;
         j = (j + 2) % 100;
@@ -112,7 +123,7 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
         client.present(Format::GS, W as u16, H as u16, &pixels).unwrap();
 
         writeln!(stdout, "i: {}, (id: {})", i, client.id()).unwrap();
-        Point::now().loop_for(Duration::from_millis(16));
+        Point::now().loop_for(Duration::from_millis(160));
     }
 }
 

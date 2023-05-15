@@ -25,14 +25,31 @@ pub enum ConnectError {
 
     Refused,
     UnknownConnectErr(io_sys::ErrNo),
-
-    ReadError(ReadError)
 }
 
 #[derive(Debug)]
 pub enum ReadError {
+    Again,
     Unknown(io_sys::ErrNo),
 }
+
+#[derive(Debug)]
+pub enum FlagsChangeError {
+    BadFd,
+    Interrupted,
+    Unknown(io_sys::ErrNo),
+}
+
+impl From<io_sys::ErrNo> for FlagsChangeError {
+    fn from(value: io_sys::ErrNo) -> Self {
+        match value {
+            io_sys::errno::EBADF => FlagsChangeError::BadFd,
+            io_sys::errno::EINTR => FlagsChangeError::Interrupted,
+            other => FlagsChangeError::Unknown(other)
+        }
+    }
+}
+
 
 #[derive(Debug)]
 pub enum WriteError {
@@ -114,6 +131,22 @@ impl Socket {
         }
     }
 
+    pub fn set_non_blocking_mode(&mut self, nbm: bool) -> Result<(), FlagsChangeError> {
+        unsafe {
+            let mut flags = io_sys::fcntl(self.fd, io_sys::F_GETFL, 0)
+                .map_err(|e|FlagsChangeError::from(e))?;
+
+            if nbm {
+                flags = flags | io_sys::bits::O_NONBLOCK;
+            } else {
+                flags = flags & !io_sys::bits::O_NONBLOCK;
+            }
+
+            io_sys::fcntl(self.fd, io_sys::F_SETFL, flags)
+                .map_err(|e|FlagsChangeError::from(e))?;
+        }
+        Ok(())
+    }
 
     pub fn write_bytes(&mut self, b: &[u8]) -> Result<usize, WriteError> {
         match unsafe {
@@ -163,7 +196,7 @@ impl Socket {
         } {
             Ok(bytes) => Ok(bytes),
             Err(errno) => match errno {
-                io_sys::errno::EAGAIN => todo!(),
+                io_sys::errno::EAGAIN => Err(ReadError::Again),
                 io_sys::errno::EBADF => todo!(),
                 io_sys::errno::EFAULT => todo!(),
                 io_sys::errno::EINTR => todo!(),

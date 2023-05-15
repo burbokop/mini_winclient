@@ -34,6 +34,14 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian-control/postrm.in
                ${CMAKE_CURRENT_BINARY_DIR}/packaging/debian-control/postrm)
 
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_BINARY_DIR}/packaging/debian-control/postinst;${CMAKE_CURRENT_BINARY_DIR}/packaging/debian-control/prerm;${CMAKE_CURRENT_BINARY_DIR}/packaging/debian-control/postrm")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt6core6 (>= 6.4.2+dfsg~), libqt6quick6 (>= 6.4.2+dfsg~), qml6-module-qtquick-window (>= 6.4.2+dfsg~), qml6-module-qtqml-workerscript (>= 6.4.2+dfsg~)")
+
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "
+    libqt6core6 (>= ${Qt6_VERSION}+dfsg~),
+    libqt6quick6 (>= ${Qt6_VERSION}+dfsg~),
+    qml6-module-qtquick-window (>= ${Qt6_VERSION}+dfsg~),
+    qml6-module-qtqml-workerscript (>= ${Qt6_VERSION}+dfsg~)")
+
+string(REGEX REPLACE "\n[ ]*" " " CPACK_DEBIAN_PACKAGE_DEPENDS ${CPACK_DEBIAN_PACKAGE_DEPENDS})
+string(STRIP ${CPACK_DEBIAN_PACKAGE_DEPENDS} CPACK_DEBIAN_PACKAGE_DEPENDS)
 
 include (CPack)

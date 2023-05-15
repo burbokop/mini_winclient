@@ -11,6 +11,21 @@
 
 namespace {
 
+namespace in_package_types {
+constexpr std::uint8_t Present = 0;
+}
+
+namespace out_package_types {
+constexpr std::uint8_t Init = 0;
+constexpr std::uint8_t Event = 1;
+} // namespace out_package_types
+
+namespace event_types {
+constexpr std::uint8_t Close = 0;
+constexpr std::uint8_t Resize = 1;
+} // namespace event_types
+
+namespace transmute {
 template<typename T>
 std::optional<T> read(QIODevice *dev)
 {
@@ -25,10 +40,44 @@ std::optional<T> read(QIODevice *dev)
 }
 
 template<typename T>
-void write(QIODevice *dev, const T &v)
+std::size_t write(QIODevice *dev, const T &v)
 {
     const auto ptr = reinterpret_cast<const char *>(&v);
-    assert(dev->write(ptr, sizeof(T)) == sizeof(T));
+    const auto bytes = dev->write(ptr, sizeof(T));
+    assert(bytes == sizeof(T));
+    return bytes;
+}
+} // namespace transmute
+
+class Package
+{
+public:
+    template<typename T>
+    std::size_t write(const T &v)
+    {
+        return transmute::write(m_dev, v);
+    }
+
+    friend void writePackage(QIODevice *dev, std::function<void(Package)> writeFn);
+
+private:
+    Package(QIODevice *dev)
+        : m_dev(dev)
+    {}
+
+    QIODevice *m_dev = nullptr;
+};
+
+void writePackage(QIODevice *dev, std::function<void(Package)> writeFn)
+{
+    QByteArray arr;
+    {
+        QBuffer buf(&arr);
+        buf.open(QIODevice::WriteOnly);
+        writeFn(Package(&buf));
+    }
+    transmute::write(dev, std::uint32_t(arr.size()));
+    dev->write(arr);
 }
 
 std::optional<QImage::Format> parseFormat(std::uint8_t fmt)
@@ -52,21 +101,22 @@ std::optional<WinClient::Frame> WinClient::parseFrame(QByteArray &&arr,
     QBuffer buf(&arr);
     buf.open(QIODevice::ReadOnly);
 
-    const auto protoVersion = read<std::uint8_t>(&buf);
+    const auto protoVersion = transmute::read<std::uint8_t>(&buf);
     assert(protoVersion);
-    const auto clientId = read<std::uint8_t>(&buf);
+    const auto clientId = transmute::read<std::uint8_t>(&buf);
     assert(clientId);
     WARN_WITH_MSG(*clientId == cid, "Client id does not match");
-    const auto packageType = read<std::uint8_t>(&buf);
+    const auto packageType = transmute::read<std::uint8_t>(&buf);
     assert(packageType);
-    WARN_WITH_MSG(*packageType == 0, "Server suports only package type 0 (present)");
-    const auto format = read<std::uint8_t>(&buf);
+    WARN_WITH_MSG(*packageType == in_package_types::Present,
+                  "Server suports only package type " << in_package_types::Present << " (present)");
+    const auto format = transmute::read<std::uint8_t>(&buf);
     assert(format);
-    const auto pixelSize = read<std::uint8_t>(&buf);
+    const auto pixelSize = transmute::read<std::uint8_t>(&buf);
     assert(pixelSize);
-    const auto w = read<std::uint16_t>(&buf);
+    const auto w = transmute::read<std::uint16_t>(&buf);
     assert(w);
-    const auto h = read<std::uint16_t>(&buf);
+    const auto h = transmute::read<std::uint16_t>(&buf);
     assert(h);
     QByteArray pixels = buf.readAll();
 
@@ -95,24 +145,21 @@ WinClient::WinClient(QTcpSocket *socket, uint8_t clientId, QObject *parent)
     , m_socket(socket)
     , m_id(clientId)
 {
-    write(m_socket,
-          std::uint32_t(sizeof(std::uint8_t)   // package type
-                        + sizeof(std::uint8_t) // client id
-                        ));
-    write(m_socket, std::uint8_t(0));
-    write(m_socket, m_id);
-    if (!m_socket->waitForBytesWritten()) {
-        qmlWarning(this) << "Can not write init package: " << m_socket->errorString() << " ("
-                         << QMetaEnum::fromType<QTcpSocket::SocketError>().valueToKey(
-                                m_socket->error())
-                         << ")";
-        QMetaObject::invokeMethod(this, [this]() { emit dead(QPrivateSignal()); });
-        return;
-    }
+    QMetaObject::invokeMethod(
+        this,
+        [this]() {
+            transmute::write(m_socket,
+                             std::uint32_t(sizeof(std::uint8_t)   // package type
+                                           + sizeof(std::uint8_t) // client id
+                                           ));
+            transmute::write(m_socket, std::uint8_t(0));
+            transmute::write(m_socket, m_id);
+        },
+        Qt::QueuedConnection);
 
     connect(m_socket, &QTcpSocket::readyRead, this, [this]() {
         if (!m_currentPackageSize) {
-            if (const auto packageSize = read<std::uint32_t>(m_socket)) {
+            if (const auto packageSize = transmute::read<std::uint32_t>(m_socket)) {
                 m_currentPackageSize = *packageSize;
             }
         }
@@ -148,7 +195,12 @@ WinClient::WinClient(QTcpSocket *socket, uint8_t clientId, QObject *parent)
 
 void WinClient::sendCloseEvent()
 {
-    qmlWarning(this) << "TODO: WinClient::sendCloseEvent";
+    writePackage(m_socket, [](Package p) {
+        p.write(out_package_types::Event);
+        p.write(event_types::Close);
+    });
+
+    //qmlWarning(this) << "TODO: WinClient::sendCloseEvent";
 }
 
 QString WinClient::title() const

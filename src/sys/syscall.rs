@@ -17,6 +17,7 @@ pub mod nums {
     pub static SYS_CLOSE        : usize = 3;
     pub static SYS_SOCKET       : usize = 41;
     pub static SYS_CONNECT      : usize = 42;
+    pub static SYS_FCNTL        : usize = 72;
     pub static SYS_GETTIMEOFDAY : usize = 96;
 }
 

@@ -1,7 +1,18 @@
-use core::{mem::{size_of}, slice};
+use core::{
+    mem::size_of,
+    slice
+};
 
-use crate::{socket::{Socket, ConnectError, WriteError, ReadError}, sys::io_sys::STDOUT, write::WriteFd};
-
+use crate::{
+    socket::{
+        Socket,
+        WriteError,
+        ReadError, self, FlagsChangeError
+    },
+    bufsocket::{BufSocket, self},
+    sys::io_sys::STDOUT,
+    write::WriteFd, event::{Event, self}
+};
 
 pub enum Format {
     GS = 0,
@@ -10,8 +21,54 @@ pub enum Format {
 
 const PROTO_VERSION: u8 = 0;
 
-pub struct Client {
-    s: Socket,
+pub type PackageType = u8;
+
+mod in_package_types {
+    pub const INIT: super::PackageType = 0;
+    pub const EVENT: super::PackageType = 1;
+}
+
+mod out_package_types {
+    pub const PRESENT: super::PackageType = 0;
+}
+
+#[derive(Debug)]
+pub enum Package {
+    Init(u8),
+    Event(Event)
+}
+
+#[derive(Debug)]
+pub enum PackageError {
+    ReadError(ReadError),
+    UnknownType(u8),
+    EventErr(event::Error)
+}
+
+impl Package {
+    pub fn pull<const CAPACITY: usize, const CHUNK_LEN: usize>(s: &mut BufSocket<CAPACITY, CHUNK_LEN>) -> Result<Package, PackageError> {
+        let mut pakcage_type: PackageType = 0;
+        assert!(s.read_transmuted(&mut pakcage_type));
+        match pakcage_type {
+            in_package_types::INIT => todo!(),
+            in_package_types::EVENT => match Event::pull(s) {
+                Ok(event) => Ok(Package::Event(event)),
+                Err(err) => Err(PackageError::EventErr(err)),
+            },
+            p => Err(PackageError::UnknownType(p))
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ConnectError {
+    ConnectError(socket::ConnectError),
+    ReadError(ReadError)
+}
+
+
+pub struct Client<const CAPACITY: usize, const CHUNK_LEN: usize> {
+    s: BufSocket<CAPACITY, CHUNK_LEN>,
     id: u8
 }
 
@@ -22,14 +79,20 @@ pub struct Pull {
     pub h: u16,
 }
 
-impl Client {
+impl<const CAPACITY: usize, const CHUNK_LEN: usize> Client<CAPACITY, CHUNK_LEN> {
     pub fn connect(ip: [u8; 4], port: u16) -> Result<Self, ConnectError> {
-        Socket::connect(ip, port).and_then(|mut s|
-            match Self::wait_for_init(&mut s) {
-                Ok(id) => Ok(Self { s, id }),
+        match BufSocket::connect(ip, port) {
+            Ok(mut s) => match Self::wait_for_init(&mut s.soc()) {
+                Ok(id) => Ok(Self { s, id,  }),
                 Err(err) => Err(ConnectError::ReadError(err)),
-            }
-        )
+            },
+            Err(err) => Err(ConnectError::ConnectError(err)),
+        }
+    }
+
+    #[inline]
+    pub fn set_non_blocking_mode(&mut self, nbm: bool) -> Result<(), FlagsChangeError> {
+        self.s.set_non_blocking_mode(nbm)
     }
 
     #[inline]
@@ -42,7 +105,6 @@ impl Client {
     }
 
     fn wait_for_init(s: &mut Socket) -> Result<u8, ReadError> {
-
         let mut package_size: u32 = 0;
 
         let mut btr: usize = 0;
@@ -50,7 +112,6 @@ impl Client {
             btr = s.read_transmuted(&mut package_size)?;
         }
         assert_eq!(btr, size_of::<u32>());
-
         assert_eq!(package_size as usize, size_of::<u8>() + size_of::<u8>());
 
         let mut package_type: u8 = 0;
@@ -62,9 +123,35 @@ impl Client {
         Ok(client_id)
     }
 
-    pub fn present<P: Sized>(&mut self, format: Format, w: u16, h: u16, pixels: &[P]) -> Result<(), WriteError> {
-        const PACKAGE_TYPE: u8 = 0;
+    pub fn read_package(&mut self) -> Result<Option<Package>, PackageError> {
+        match self.s.bufferize() {
+            Ok(_) => {
+                let mut package_size: u32 = 0;
+                if self.s.peek_transmuted(&mut package_size) {
+                    if self.s.bytes_available() >= size_of::<u32>() + package_size as usize {
+                        self.s.read_transmuted(&mut package_size);
 
+                        return Package::pull(&mut self.s).map(|p| Some(p));
+                    }
+                }
+                Ok(None)
+            },
+            Err(err) => match err {
+                ReadError::Again => Ok(None),
+                err => Err(PackageError::ReadError(err)),
+            },
+        }
+    }
+
+    //pub fn pull_event(&mut self) -> Option<Event> {
+    //    let mut package_size: u32 = 0;
+    //    if self.s.peek_transmuted(&mut package_size)? {
+    //        self.s.bytes_available() >= size_of::<u32>()
+    //    }
+//
+    //}
+
+    pub fn present<P: Sized>(&mut self, format: Format, w: u16, h: u16, pixels: &[P]) -> Result<(), WriteError> {
         let format = format as u8;
         let pixel_size = size_of::<P>() as u8;
 
@@ -88,7 +175,7 @@ impl Client {
 
         self.s.write_transmuted(Self::proto_version())?;
         self.s.write_transmuted(self.id)?;
-        self.s.write_transmuted(PACKAGE_TYPE)?;
+        self.s.write_transmuted(out_package_types::PRESENT)?;
         self.s.write_transmuted(format)?;
         self.s.write_transmuted(pixel_size)?;
         self.s.write_transmuted(w)?;
@@ -99,11 +186,11 @@ impl Client {
         Ok(())
     }
 
-    pub fn pull(&mut self) -> Result<Pull, ReadError> {
-        let mut p: Pull = Pull { flags: 0, w: 0, h: 0 };
-        self.s.read_bytes(unsafe {
-            slice::from_raw_parts_mut((&mut p) as *mut Pull as *mut u8, size_of::<Pull>())
-        })?;
-        Ok(p)
-    }
+    //pub fn pull(&mut self) -> Result<Pull, ReadError> {
+    //    let mut p: Pull = Pull { flags: 0, w: 0, h: 0 };
+    //    self.s.read_bytes(unsafe {
+    //        slice::from_raw_parts_mut((&mut p) as *mut Pull as *mut u8, size_of::<Pull>())
+    //    })?;
+    //    Ok(p)
+    //}
 }
