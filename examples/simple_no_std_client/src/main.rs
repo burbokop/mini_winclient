@@ -96,11 +96,18 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     let mut i = 0;
     let mut j: usize = 0;
-    loop {
 
+    let mut alive = true;
+    while alive {
         writeln!(stdout, "try read:").unwrap();
         if let Some(a) = client.read_package().unwrap() {
-            writeln!(stdout, "input package: {:?}", a).unwrap();
+            match a {
+                mini_winclient::winclient::Package::Init(_) => todo!(),
+                mini_winclient::winclient::Package::Event(event) => match event {
+                    mini_winclient::event::Event::Close => alive = false,
+                    mini_winclient::event::Event::Resize { w, h } => todo!(),
+                },
+            }
         }
         writeln!(stdout, "end reading").unwrap();
 
@@ -123,8 +130,9 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
         client.present(Format::GS, W as u16, H as u16, &pixels).unwrap();
 
         writeln!(stdout, "i: {}, (id: {})", i, client.id()).unwrap();
-        Point::now().loop_for(Duration::from_millis(1600));
+        Point::now().loop_for(Duration::from_millis(100));
     }
+    0
 }
 
 #[cfg(not(test))]

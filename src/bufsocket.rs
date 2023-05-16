@@ -54,9 +54,9 @@ impl<const CAPACITY: usize, const CHUNK_LEN: usize> BufSocket<CAPACITY, CHUNK_LE
             let sl = unsafe {
                 slice::from_raw_parts_mut(dst as *mut T as *mut u8, size_of::<T>())
             };
+            assert_eq!(self.read_bytes(sl), sl.len());
             #[cfg(target_endian = "little")]
             sl.reverse();
-            assert_eq!(self.read_bytes(sl), sl.len());
             true
         } else {
             false
@@ -69,9 +69,9 @@ impl<const CAPACITY: usize, const CHUNK_LEN: usize> BufSocket<CAPACITY, CHUNK_LE
             let sl = unsafe {
                 slice::from_raw_parts_mut(dst as *mut T as *mut u8, size_of::<T>())
             };
+            assert_eq!(self.peek(sl), sl.len());
             #[cfg(target_endian = "little")]
             sl.reverse();
-            assert_eq!(self.peek(sl), sl.len());
             true
         } else {
             false
@@ -81,17 +81,10 @@ impl<const CAPACITY: usize, const CHUNK_LEN: usize> BufSocket<CAPACITY, CHUNK_LE
     #[inline]
     pub fn bufferize_chunk(&mut self) -> Result<usize, ReadError> {
         let can_read_bytes = self.buf.push_ability();
-        use core::fmt::Write;
-
-        let mut stdout = WriteFd::new(STDOUT);
-
-        writeln!(stdout, "bufferize_chunk:can_read_bytes: {}", can_read_bytes).unwrap();
 
         Ok(if can_read_bytes > 0 {
             let bytes_read = self.s.read_bytes(&mut self.chunk[0..can_read_bytes.min(CHUNK_LEN)])?;
-            writeln!(stdout, "bufferize_chunk:bytes_read: {}", bytes_read).unwrap();
             for i in 0..bytes_read {
-                writeln!(stdout, "bufferize_chunk:i: {}, {:x}", i, self.chunk[i]).unwrap();
                 assert!(self.buf.push(self.chunk[i]));
             }
             bytes_read
@@ -102,9 +95,16 @@ impl<const CAPACITY: usize, const CHUNK_LEN: usize> BufSocket<CAPACITY, CHUNK_LE
     pub fn bufferize(&mut self) -> Result<usize, ReadError> {
         let mut bufferized = 0;
         loop {
-            let b = self.bufferize_chunk()?;
-            if b == 0 { break; }
-            bufferized += b;
+            match self.bufferize_chunk() {
+                Ok(count) => {
+                    if count == 0 { break; }
+                    bufferized += count;
+                },
+                Err(err) => match err {
+                    ReadError::Again => break,
+                    err => Err(err)?,
+                },
+            }
         }
         Ok(bufferized)
     }

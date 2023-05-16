@@ -9,7 +9,7 @@ use crate::{
         WriteError,
         ReadError, self, FlagsChangeError
     },
-    bufsocket::{BufSocket, self},
+    bufsocket::BufSocket,
     sys::io_sys::STDOUT,
     write::WriteFd, event::{Event, self}
 };
@@ -66,17 +66,9 @@ pub enum ConnectError {
     ReadError(ReadError)
 }
 
-
 pub struct Client<const CAPACITY: usize, const CHUNK_LEN: usize> {
     s: BufSocket<CAPACITY, CHUNK_LEN>,
     id: u8
-}
-
-#[repr(C)]
-pub struct Pull {
-    pub flags: u32,
-    pub w: u16,
-    pub h: u16,
 }
 
 impl<const CAPACITY: usize, const CHUNK_LEN: usize> Client<CAPACITY, CHUNK_LEN> {
@@ -124,55 +116,22 @@ impl<const CAPACITY: usize, const CHUNK_LEN: usize> Client<CAPACITY, CHUNK_LEN> 
     }
 
     pub fn read_package(&mut self) -> Result<Option<Package>, PackageError> {
-        use core::fmt::Write;
+        self.s.bufferize()
+            .map_err(|e| PackageError::ReadError(e))?;
 
-        let mut stdout = WriteFd::new(STDOUT);
-
-        writeln!(stdout, "read_package:").unwrap();
-
-        match self.s.bufferize() {
-            Ok(_) => {
-                writeln!(stdout, "read_package:bufferized").unwrap();
-
-                let mut package_size: u32 = 0;
-                if self.s.peek_transmuted(&mut package_size) {
-                    writeln!(stdout, "read_package:peek_transmuted(psize)): {} => {} + {} = {}",
-                        self.s.bytes_available(),
-                        size_of::<u32>(),
-                        package_size, self.s.bytes_available() >= size_of::<u32>() + package_size as usize
-                    ).unwrap();
-
-                    if self.s.bytes_available() >= size_of::<u32>() + package_size as usize {
-                        self.s.read_transmuted(&mut package_size);
-
-                        return Package::pull(&mut self.s).map(|p| Some(p));
-                    }
-                }
-                Ok(None)
-            },
-            Err(err) => match err {
-                ReadError::Again => {
-                    writeln!(stdout, "read_package:Again").unwrap();
-
-                    Ok(None)
-                },
-                err => Err(PackageError::ReadError(err)),
-            },
+        let mut package_size: u32 = 0;
+        if self.s.peek_transmuted(&mut package_size) {
+            if self.s.bytes_available() >= size_of::<u32>() + package_size as usize {
+                self.s.read_transmuted(&mut package_size);
+                return Package::pull(&mut self.s).map(|p| Some(p));
+            }
         }
+        Ok(None)
     }
-
-    //pub fn pull_event(&mut self) -> Option<Event> {
-    //    let mut package_size: u32 = 0;
-    //    if self.s.peek_transmuted(&mut package_size)? {
-    //        self.s.bytes_available() >= size_of::<u32>()
-    //    }
-//
-    //}
 
     pub fn present<P: Sized>(&mut self, format: Format, w: u16, h: u16, pixels: &[P]) -> Result<(), WriteError> {
         let format = format as u8;
         let pixel_size = size_of::<P>() as u8;
-
 
         let package_size
             =(size_of::<u8>()  // Self::proto_version()
@@ -185,12 +144,7 @@ impl<const CAPACITY: usize, const CHUNK_LEN: usize> Client<CAPACITY, CHUNK_LEN> 
             + size_of::<P>() * pixels.len()
         ) as u32;
 
-        use core::fmt::Write;
-        let mut stdout = WriteFd::new(STDOUT);
-        writeln!(stdout, "ps: {} -> {}", pixels.len(), package_size).unwrap();
-
         self.s.write_transmuted(package_size)?;
-
         self.s.write_transmuted(Self::proto_version())?;
         self.s.write_transmuted(self.id)?;
         self.s.write_transmuted(out_package_types::PRESENT)?;
