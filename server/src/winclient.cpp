@@ -13,17 +13,20 @@
 namespace {
 
 namespace in_package_types {
-constexpr std::uint8_t Present = 0;
+constexpr quint8 Present = 0;
 }
 
 namespace out_package_types {
-constexpr std::uint8_t Init = 0;
-constexpr std::uint8_t Event = 1;
+constexpr quint8 Init = 0;
+constexpr quint8 Event = 1;
 } // namespace out_package_types
 
 namespace event_types {
-constexpr std::uint8_t Close = 0;
-constexpr std::uint8_t Resize = 1;
+constexpr quint8 Close = 0;
+constexpr quint8 Resize = 1;
+constexpr quint8 MouseDown = 2;
+constexpr quint8 MouseUp = 3;
+constexpr quint8 MouseMove = 4;
 } // namespace event_types
 
 namespace transmute {
@@ -216,8 +219,46 @@ void WinClient::sendCloseEvent()
         p.write(out_package_types::Event);
         p.write(event_types::Close);
     });
+}
 
-    //qmlWarning(this) << "TODO: WinClient::sendCloseEvent";
+void WinClient::sendResizeEvent(const QSize &newSize)
+{
+    writePackage(m_socket, [newSize](Package p) {
+        p.write(out_package_types::Event);
+        p.write(event_types::Resize);
+        p.write(quint16(newSize.width()));
+        p.write(quint16(newSize.height()));
+    });
+}
+
+void WinClient::sendMouseDownEvent(const QPoint &point)
+{
+    writePackage(m_socket, [point](Package p) {
+        p.write(out_package_types::Event);
+        p.write(event_types::MouseDown);
+        p.write(quint16(point.x()));
+        p.write(quint16(point.y()));
+    });
+}
+
+void WinClient::sendMouseUpEvent(const QPoint &point)
+{
+    writePackage(m_socket, [point](Package p) {
+        p.write(out_package_types::Event);
+        p.write(event_types::MouseUp);
+        p.write(quint16(point.x()));
+        p.write(quint16(point.y()));
+    });
+}
+
+void WinClient::sendMouseMoveEvent(const QPoint &point)
+{
+    writePackage(m_socket, [point](Package p) {
+        p.write(out_package_types::Event);
+        p.write(event_types::MouseMove);
+        p.write(quint16(point.x()));
+        p.write(quint16(point.y()));
+    });
 }
 
 QString WinClient::title() const

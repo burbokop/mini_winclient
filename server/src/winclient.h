@@ -28,8 +28,6 @@ class WinClient : public QObject
 public:
     WinClient(QTcpSocket *socket, std::uint8_t clientId, QObject *parent = nullptr);
 
-    void sendCloseEvent();
-
     const QImage &image() const
     {
         static const QImage null;
@@ -40,6 +38,13 @@ public:
 
     QString title() const;
     std::uint8_t id() const { return m_id; };
+
+public slots:
+    void sendCloseEvent();
+    void sendResizeEvent(const QSize &newSize);
+    void sendMouseDownEvent(const QPoint &p);
+    void sendMouseUpEvent(const QPoint &p);
+    void sendMouseMoveEvent(const QPoint &p);
 
 signals:
     void dead(QPrivateSignal);

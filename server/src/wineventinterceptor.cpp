@@ -18,6 +18,10 @@ bool WinEventInterceptor::eventFilter(QObject *watched, QEvent *event)
         WANR_CLIENT_NOT_SET
         m_client->sendCloseEvent();
         return true;
+    } else if (const auto resizeEvent = dynamic_cast<QResizeEvent *>(event)) {
+        WANR_CLIENT_NOT_SET
+        m_client->sendResizeEvent(resizeEvent->size());
+        return true;
     } else {
         return false;
     }

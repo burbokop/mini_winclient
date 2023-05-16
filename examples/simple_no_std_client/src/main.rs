@@ -100,12 +100,12 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let mut alive = true;
     while alive {
         writeln!(stdout, "try read:").unwrap();
-        if let Some(a) = client.read_package().unwrap() {
+        while let Some(a) = client.read_package().unwrap() {
             match a {
                 mini_winclient::winclient::Package::Init(_) => todo!(),
                 mini_winclient::winclient::Package::Event(event) => match event {
                     mini_winclient::event::Event::Close => alive = false,
-                    mini_winclient::event::Event::Resize { w, h } => todo!(),
+                    mini_winclient::event::Event::Resize { w, h } => writeln!(stdout, "resize: {}x{}", w, h).unwrap(),
                 },
             }
         }
