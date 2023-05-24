@@ -1,7 +1,5 @@
 #![no_std]
 #![feature(maybe_uninit_uninit_array)]
-#![feature(generic_const_exprs)]
-#![feature(inherent_associated_types)]
 
 mod sys;
 mod read;

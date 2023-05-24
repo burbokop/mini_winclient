@@ -1,7 +1,15 @@
 use core::{mem::{MaybeUninit, size_of}, slice};
 
-use crate::{socket::{Socket, WriteError, ReadError, self, FlagsChangeError, ConnectError}, STDOUT, write::WriteFd, utils::CyclicBuf};
-
+use crate::{
+    socket::{
+        Socket,
+        WriteError,
+        ReadError,
+        FlagsChangeError,
+        ConnectError
+    },
+    utils::CyclicBuf
+};
 
 pub struct BufSocket<const CAPACITY: usize, const CHUNK_LEN: usize> {
     s: Socket,

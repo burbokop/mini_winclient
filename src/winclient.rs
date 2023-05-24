@@ -10,13 +10,13 @@ use crate::{
         ReadError, self, FlagsChangeError
     },
     bufsocket::BufSocket,
-    sys::io_sys::STDOUT,
-    write::WriteFd, event::{Event, self}
+    event::{Event, self}
 };
 
 pub enum Format {
     GS = 0,
     ARGB = 1,
+    VGA = 2,
 }
 
 const PROTO_VERSION: u8 = 0;

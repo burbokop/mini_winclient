@@ -1,7 +1,4 @@
-use crate::{read::{
-    read_be_u8,
-    read_be_u16
-}, bufsocket::BufSocket};
+use crate::bufsocket::BufSocket;
 
 mod event_types {
     pub const CLOSE: u8 = 0;

@@ -8,7 +8,8 @@ qt_add_executable(mini_winserver
     winclientview.h
     winclientview.cpp
     wineventinterceptor.h
-    wineventinterceptor.cpp)
+    wineventinterceptor.cpp
+    vgapalette.h)
 
 qt_add_qml_module(mini_winserver
     URI org.burbokop.mini_winserver

@@ -3,6 +3,7 @@
 #include <QQmlInfo>
 #include <QTcpSocket>
 #include <bit>
+#include <vgapalette.h>
 
 #define WARN_WITH_MSG(cond, msg) \
     if (!(cond)) { \
@@ -107,9 +108,20 @@ std::optional<QImage::Format> parseFormat(std::uint8_t fmt)
         return QImage::Format_Grayscale8;
     case 1:
         return QImage::Format_ARGB32;
+    case 2: // VGA
+        return QImage::Format_Indexed8;
     default:
         return std::nullopt;
     }
+}
+
+QImage createImage(const uchar *data, int width, int height, QImage::Format format)
+{
+    auto result = QImage(data, width, height, format);
+    if (format == QImage::Format_Indexed8) {
+        result.setColorTable(QList<QRgb>(vga::palette, vga::palette + vga::paletteLen));
+    }
+    return result;
 }
 
 } // namespace
@@ -146,7 +158,11 @@ std::optional<WinClient::Frame> WinClient::parseFrame(QByteArray &&arr,
 
     const auto fmt = parseFormat(*format);
     WARN_WITH_MSG(fmt, "Unknown pix format: " << *format);
-    const QImage image(reinterpret_cast<const uchar *>(pixels.constData()), *w, *h, *fmt);
+
+    const QImage image = createImage(reinterpret_cast<const uchar *>(pixels.constData()),
+                                     *w,
+                                     *h,
+                                     *fmt);
 
     WARN_WITH_MSG(!image.isNull(), "Invalid image");
     WARN_WITH_MSG(image.depth() == (*pixelSize * 8),
